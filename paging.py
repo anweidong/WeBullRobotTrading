@@ -1,22 +1,8 @@
 import requests
 from datetime import datetime
-import logging
-from logging.handlers import TimedRotatingFileHandler
+from logger import get_logger
 
-# Configure logging
-logger = logging.getLogger('paging')
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# File handler with daily rotation
-file_handler = TimedRotatingFileHandler(
-    'log/paging.log',
-    when='midnight',
-    interval=1,
-    backupCount=30  # Keep logs for 30 days
-)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+logger = get_logger(__name__)
 
 # Read the credentials from the file
 with open('credentials.txt', 'r') as file:

@@ -1,30 +1,15 @@
 import time
 import os
-import logging
-from logging.handlers import TimedRotatingFileHandler
 from alpaca.trading.client import TradingClient
 from paging import send_notification
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest
-
 from gmail_reader import process_messages
+from logger import get_logger
 
-# Configure logging
-logger = logging.getLogger('trading_bot')
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# File handler with daily rotation
-file_handler = TimedRotatingFileHandler(
-    'log/trading.log',
-    when='midnight',
-    interval=1,
-    backupCount=30  # Keep logs for 30 days
-)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+logger = get_logger(__name__)
 
 # Constants
 INVEST_PERCENTAGE = 0.9  # 90% of available balance
@@ -155,5 +140,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-
+    # main()
+    pass
+    print(check_signal())

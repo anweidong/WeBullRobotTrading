@@ -8,23 +8,9 @@ import base64
 from email.message import EmailMessage
 from datetime import datetime
 import pytz
-import logging
-from logging.handlers import TimedRotatingFileHandler
+from logger import get_logger
 
-# Configure logging
-logger = logging.getLogger('gmail_reader')
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# File handler with daily rotation
-file_handler = TimedRotatingFileHandler(
-    'log/gmail.log',
-    when='midnight',
-    interval=1,
-    backupCount=30  # Keep logs for 30 days
-)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+logger = get_logger(__name__)
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
