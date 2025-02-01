@@ -1,5 +1,7 @@
 import time
 import os
+import logging
+from logging.handlers import TimedRotatingFileHandler
 from alpaca.trading.client import TradingClient
 from paging import send_notification
 from alpaca.trading.requests import MarketOrderRequest
@@ -8,6 +10,21 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest
 
 from gmail_reader import process_messages
+
+# Configure logging
+logger = logging.getLogger('trading_bot')
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# File handler with daily rotation
+file_handler = TimedRotatingFileHandler(
+    'log/trading.log',
+    when='midnight',
+    interval=1,
+    backupCount=30  # Keep logs for 30 days
+)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
 # Constants
 INVEST_PERCENTAGE = 0.9  # 90% of available balance
@@ -49,10 +66,10 @@ def place_us_order(symbol, qty, side):
 
     try:
         order = trading_client.submit_order(order_details)
-        print(f"Order placed: {order}")
+        logger.info(f"Order placed: {order}")
         return True
     except Exception as e:
-        print(f"Error placing order: {e}")
+        logger.error(f"Error placing order: {e}")
         return False
 
 def get_position_quantity(symbol):
@@ -99,38 +116,44 @@ def check_signal():
     return None, None
 
 
-
-
 def main():
     try:
+        logger.info("Starting trading bot...")
         while True:
-            signal_type, symbol = check_signal()  # Implement your signal logic
-            if signal_type is None:
-                time.sleep(POLLING_FREQUENCY)
-            
-            current_balance = get_us_balance()
-            current_price = get_current_price(symbol)
-            
-            if signal_type == 'BUY' and current_balance > 0:
-                invest_amt = current_balance * INVEST_PERCENTAGE
-                qty = round(invest_amt / current_price, 2)  # Allow fractional shares with 2 decimal points
-                if qty > 0:
-                    print(f"Buying {qty} shares of {symbol} at ${current_price:.2f}")
-                    if place_us_order(symbol, qty, 'BUY'):
-                        send_notification("BUY Signal", f"Bought {qty} shares of {symbol} at ${current_price:.2f}", priority=-1)
+            try:
+                signal_type, symbol = check_signal()
+                if signal_type is None:
+                    time.sleep(POLLING_FREQUENCY)
                 
-            elif signal_type == 'SELL':
-                qty = get_position_quantity(symbol)
-                if qty > 0:
-                    print(f"Selling {qty} shares of {symbol}")
-                    if place_us_order(symbol, qty, 'SELL'):
-                        send_notification("SELL Signal", f"Sold {qty} shares of {symbol} at ${current_price:.2f}", priority=-1)
-            
-            time.sleep(POLLING_FREQUENCY)  # Reduce polling frequency
+                current_balance = get_us_balance()
+                current_price = get_current_price(symbol)
+                
+                if signal_type == 'BUY' and current_balance > 0:
+                    invest_amt = current_balance * INVEST_PERCENTAGE
+                    qty = round(invest_amt / current_price, 2)  # Allow fractional shares with 2 decimal points
+                    if qty > 0:
+                        logger.info(f"Buying {qty} shares of {symbol} at ${current_price:.2f}")
+                        if place_us_order(symbol, qty, 'BUY'):
+                            send_notification("BUY Signal", f"Bought {qty} shares of {symbol} at ${current_price:.2f}", priority=-1)
+                    
+                elif signal_type == 'SELL':
+                    qty = get_position_quantity(symbol)
+                    if qty > 0:
+                        logger.info(f"Selling {qty} shares of {symbol}")
+                        if place_us_order(symbol, qty, 'SELL'):
+                            send_notification("SELL Signal", f"Sold {qty} shares of {symbol} at ${current_price:.2f}", priority=-1)
+                    else:
+                        logger.warning(f"No {symbol} available while trying to sell")
+                
+                time.sleep(POLLING_FREQUENCY)
+            except Exception as e:
+                logger.error(f"Error while trading {e}")
+                send_notification("ERROR Trading", f"Error while trading {e}")
 
     except KeyboardInterrupt:
-        print("\nStopping trading bot...")
+        logger.info("Stopping trading bot...")
 
 
 if __name__ == "__main__":
-    print(get_us_balance())
+    main()
+

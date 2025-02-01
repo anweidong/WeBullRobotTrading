@@ -8,6 +8,23 @@ import base64
 from email.message import EmailMessage
 from datetime import datetime
 import pytz
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+# Configure logging
+logger = logging.getLogger('gmail_reader')
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# File handler with daily rotation
+file_handler = TimedRotatingFileHandler(
+    'log/gmail.log',
+    when='midnight',
+    interval=1,
+    backupCount=30  # Keep logs for 30 days
+)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
@@ -75,7 +92,7 @@ def get_messages_by_label(service, label_name, max_results=10):
         return messages
         
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         return []
 
 def is_message_within_one_minute(message_date):
@@ -150,7 +167,7 @@ def read_message(service, msg_id):
             body = base64.urlsafe_b64decode(message['payload']['body']['data']).decode('utf-8')
         
         if not body:
-            print(f"Warning: Could not extract body from message {msg_id}")
+            logger.warning(f"Could not extract body from message {msg_id}")
             
         # Get message date from headers
         date_str = ''
@@ -172,7 +189,7 @@ def read_message(service, msg_id):
                 message_date = datetime.strptime(clean_date, '%a, %d %b %Y %H:%M:%S')
                 message_date = pytz.UTC.localize(message_date)
         except Exception as e:
-            print(f"Error parsing date '{date_str}': {e}")
+            logger.error(f"Error parsing date '{date_str}': {e}")
             return None
         
         return {
@@ -184,11 +201,11 @@ def read_message(service, msg_id):
         }
         
     except Exception as e:
-        print(f"An error occurred while reading message: {e}")
+        logger.error(f"An error occurred while reading message: {e}")
         return None
 
 
-def process_messages(label_name, max_messages=10):
+def process_messages(label_name="Tickeron", max_messages=10):
     """Main function to process messages with a specific label.
     
     Args:
@@ -217,6 +234,5 @@ if __name__ == "__main__":
     messages = process_messages(LABEL_NAME)
     
     for msg in messages:
-        print(msg)
-        print(f"\nSubject: {msg['subject']}")
-        print(f"Body: {msg['body'][:200]}...")  # Print first 200 chars of body
+        logger.info(f"Subject: {msg['subject']}")
+        logger.info(f"Body: {msg['body'][:200]}...")  # Log first 200 chars of body
