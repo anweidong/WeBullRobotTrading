@@ -1,5 +1,6 @@
 import time
 import os
+import datetime
 from alpaca.trading.client import TradingClient
 from paging import send_notification
 from alpaca.trading.requests import MarketOrderRequest
@@ -101,11 +102,23 @@ def check_signal():
     return None, None
 
 
+# Track last notification time
+last_notification_time = None
+
 def main():
     try:
         logger.info("Starting trading bot...")
+        global last_notification_time
         while True:
             try:
+                # Send hourly notification at :00
+                current_time = datetime.datetime.now()
+                if current_time.minute == 0 and (last_notification_time is None or 
+                    current_time.hour != last_notification_time.hour):
+                    logger.info(f"Hourly check: {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    send_notification("Hourly Update", f"Trading bot is running - {current_time.strftime('%Y-%m-%d %H:%M:%S')}", priority=-1)
+                    last_notification_time = current_time
+
                 signal_type, symbol = check_signal()
                 if signal_type is None:
                     time.sleep(POLLING_FREQUENCY)
@@ -119,14 +132,14 @@ def main():
                     if qty > 0:
                         logger.info(f"Buying {qty} shares of {symbol} at ${current_price:.2f}")
                         if place_us_order(symbol, qty, 'BUY'):
-                            send_notification("BUY Signal", f"Bought {qty} shares of {symbol} at ${current_price:.2f}", priority=-1)
+                            send_notification("BUY Signal", f"Bought {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
                     
                 elif signal_type == 'SELL':
                     qty = get_position_quantity(symbol)
                     if qty > 0:
                         logger.info(f"Selling {qty} shares of {symbol}")
                         if place_us_order(symbol, qty, 'SELL'):
-                            send_notification("SELL Signal", f"Sold {qty} shares of {symbol} at ${current_price:.2f}", priority=-1)
+                            send_notification("SELL Signal", f"Sold {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
                     else:
                         logger.warning(f"No {symbol} available while trying to sell")
                 
@@ -140,6 +153,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    pass
-    print(check_signal())
+    main()
