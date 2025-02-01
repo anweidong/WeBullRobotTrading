@@ -92,7 +92,7 @@ def is_message_within_one_minute(message_date):
     message_date_pdt = message_date.astimezone(pdt_tz)
     
     time_difference = now - message_date_pdt
-    return time_difference.total_seconds() <= 60
+    return time_difference.total_seconds() <= 120
 
 def read_message(service, msg_id):
     """Reads a specific message and returns its content.
@@ -120,20 +120,37 @@ def read_message(service, msg_id):
                 break
                 
         # Get the message body
+        body = ''
+        
+        def get_body_from_part(part):
+            """Recursively extract text from message part."""
+            if part.get('mimeType') == 'text/plain' and 'data' in part.get('body', {}):
+                return base64.urlsafe_b64decode(part['body']['data']).decode('utf-8')
+            elif part.get('mimeType') == 'text/html' and 'data' in part.get('body', {}):
+                # Only use HTML if we haven't found plain text
+                if not body:
+                    return base64.urlsafe_b64decode(part['body']['data']).decode('utf-8')
+            elif 'parts' in part:
+                # Recursively check parts
+                for subpart in part['parts']:
+                    text = get_body_from_part(subpart)
+                    if text:
+                        return text
+            return None
+
         if 'parts' in message['payload']:
-            parts = message['payload']['parts']
-            body = ''
-            for part in parts:
-                if part['mimeType'] == 'text/plain':
-                    body = base64.urlsafe_b64decode(
-                        part['body']['data']
-                    ).decode('utf-8')
+            # Handle multipart messages
+            for part in message['payload']['parts']:
+                text = get_body_from_part(part)
+                if text:
+                    body = text
                     break
-        else:
-            # Handle messages with no parts
-            body = base64.urlsafe_b64decode(
-                message['payload']['body']['data']
-            ).decode('utf-8')
+        elif 'body' in message['payload'] and 'data' in message['payload']['body']:
+            # Handle single part messages
+            body = base64.urlsafe_b64decode(message['payload']['body']['data']).decode('utf-8')
+        
+        if not body:
+            print(f"Warning: Could not extract body from message {msg_id}")
             
         # Get message date from headers
         date_str = ''
