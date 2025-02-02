@@ -122,6 +122,7 @@ def main():
                 signal_type, symbol = check_signal()
                 if signal_type is None:
                     time.sleep(POLLING_FREQUENCY)
+                    continue
                 
                 current_balance = get_us_balance()
                 current_price = get_current_price(symbol)
@@ -147,6 +148,7 @@ def main():
             except Exception as e:
                 logger.error(f"Error while trading {e}")
                 send_notification("ERROR Trading", f"Error while trading {e}")
+                time.sleep(60)
 
     except KeyboardInterrupt:
         logger.info("Stopping trading bot...")
