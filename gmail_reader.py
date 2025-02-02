@@ -221,4 +221,4 @@ if __name__ == "__main__":
     
     for msg in messages:
         logger.info(f"Subject: {msg['subject']}")
-        logger.info(f"Body: {msg['body'][:200]}...")  # Log first 200 chars of body
+        logger.info(f"Body: {msg['body']}...")  # Log first 200 chars of body

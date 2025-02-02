@@ -13,7 +13,7 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 # Constants
-INVEST_PERCENTAGE = 0.9  # 90% of available balance
+INVEST_PERCENTAGE = 0.95  # 95% of available balance
 API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
 ROBOT_NAME = os.getenv("ROBOT_NAME", "Day Trader: Price Action Bot for High Volatility and High Liquidity Stocks (TA)")
@@ -23,7 +23,7 @@ POLLING_FREQUENCY = 1  # sec
 processed_gmail_message = set()
 
 # Initialize Alpaca clients
-trading_client = TradingClient(API_KEY, API_SECRET, paper=True)
+trading_client = TradingClient(API_KEY, API_SECRET, paper=False)
 data_client = StockHistoricalDataClient(API_KEY, API_SECRET)
 
 def get_us_balance():
@@ -56,6 +56,7 @@ def place_us_order(symbol, qty, side):
         return True
     except Exception as e:
         logger.error(f"Error placing order: {e}")
+        raise e
         return False
 
 def get_position_quantity(symbol):
@@ -72,9 +73,11 @@ def check_signal():
     for msg in messages:
         if msg['id'] in processed_gmail_message:
             continue
-            
-        if ROBOT_NAME in msg["body"]:
-            message = msg["body"].lower()
+        
+        # Clean message body by removing extra spaces and newlines
+        cleaned_body = ' '.join(msg["body"].strip().splitlines())
+        if ROBOT_NAME in cleaned_body:
+            message = cleaned_body.lower()
             
             # Check for buy signal
             if "bought" in message and "shares at" in message:
@@ -143,6 +146,7 @@ def main():
                             send_notification("SELL Signal", f"Sold {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
                     else:
                         logger.warning(f"No {symbol} available while trying to sell")
+                        send_notification("Nothing to sell", f"No {symbol} available while trying to sell", priority=0)
                 
                 time.sleep(POLLING_FREQUENCY)
             except Exception as e:
