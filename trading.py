@@ -90,11 +90,11 @@ def check_signal():
                         return "BUY", symbol
             
             # Check for sell signal
-            elif "sold" in message and "shares at" in message:
+            elif "sold to close" in message and "shares at" in message:
                 # Extract symbol - assuming format "sold X SYMBOL shares at"
                 words = message.split()
                 for i, word in enumerate(words):
-                    if word == "sold to close":
+                    if word == "close":
                         symbol = words[i + 2].upper()  # Get the word after the quantity
                         processed_gmail_message.add(msg['id'])
                         return "SELL", symbol
