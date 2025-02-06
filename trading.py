@@ -80,7 +80,7 @@ def check_signal():
             message = cleaned_body.lower()
             
             # Check for buy signal
-            if "bought" in message and "shares at" in message:
+            if "bought" in message and "at" in message:
                 # Extract symbol - assuming format "bought X SYMBOL shares at"
                 words = message.split()
                 for i, word in enumerate(words):
@@ -90,8 +90,8 @@ def check_signal():
                         return "BUY", symbol
             
             # Check for sell signal
-            elif "sold to close" in message and "shares at" in message:
-                # Extract symbol - assuming format "sold X SYMBOL shares at"
+            elif "sold to close" in message and "at" in message:
+                # Extract symbol - assuming format "sold to close X SYMBOL shares at"
                 words = message.split()
                 for i, word in enumerate(words):
                     if word == "close":
