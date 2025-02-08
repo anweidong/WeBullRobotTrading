@@ -5,7 +5,7 @@
 export ALPACA_API_KEY=""
 export ALPACA_API_SECRET=""
 
-export ROBOT_NAME="Day Trader: Price Action Bot for High Volatility and High Liquidity Stocks (TA)"
+export ROBOT_NAME=""
 
 # Start the trading script
 python3 trading.py

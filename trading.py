@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 INVEST_PERCENTAGE = 0.75  # 75% of available balance
 API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
-ROBOT_NAME = os.getenv("ROBOT_NAME", "Day Trader: Price Action Bot for High Volatility and High Liquidity Stocks (TA)")
+ROBOT_NAME = os.getenv("ROBOT_NAME")
 
 POLLING_FREQUENCY = 1  # sec
 
