@@ -18,7 +18,7 @@ API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
 ROBOT_NAME = os.getenv("ROBOT_NAME")
 
-POLLING_FREQUENCY = 1  # sec
+POLLING_FREQUENCY = 0.5  # sec
 
 processed_gmail_message = set()
 active_trading_symbol = None  # Track which stock we're currently trading
@@ -227,7 +227,7 @@ def main():
             except Exception as e:
                 logger.error(f"Error while trading {e}")
                 send_notification("ERROR Trading", f"Error while trading {e}")
-                time.sleep(60)
+                time.sleep(POLLING_FREQUENCY)
 
     except KeyboardInterrupt:
         logger.info("Stopping trading bot...")
