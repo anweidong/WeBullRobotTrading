@@ -13,7 +13,8 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 # Constants
-INVEST_PERCENTAGE = 0.75  # 75% of available balance
+MAX_CONCURRENT_SYMBOLS = 2  # Maximum number of concurrent active trading symbols
+INVEST_PERCENTAGE = 0.9 / MAX_CONCURRENT_SYMBOLS  # 45% of available balance per symbol
 API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
 ROBOT_NAME = os.getenv("ROBOT_NAME")
@@ -21,7 +22,8 @@ ROBOT_NAME = os.getenv("ROBOT_NAME")
 POLLING_FREQUENCY = 0.5  # sec
 
 processed_gmail_message = set()
-active_trading_symbol = None  # Track which stock we're currently trading
+active_trading_symbols = set()  # Track which stocks we're currently trading
+initial_cash = None  # Store initial cash balance when we start trading
 
 # Initialize Alpaca clients
 trading_client = TradingClient(API_KEY, API_SECRET, paper=False)
@@ -70,19 +72,19 @@ def get_position_quantity(symbol):
 
 def can_trade_symbol(symbol, signal_type):
     """Check if we can trade this symbol"""
-    global active_trading_symbol
+    global active_trading_symbols
     
-    # For new positions (BUY/SHORT), only allow if no active symbol
+    # For new positions (BUY/SHORT), only allow if we haven't reached max concurrent symbols
     if signal_type in ['BUY', 'SHORT']:
-        if active_trading_symbol is None:
+        if len(active_trading_symbols) < MAX_CONCURRENT_SYMBOLS:
             return True
         return False
     
-    # For closing positions (SELL/COVER), only allow if it matches active symbol
+    # For closing positions (SELL/COVER), only allow if it's in our active symbols
     # and we have a position
     if signal_type in ['SELL', 'COVER']:
         position_qty = get_position_quantity(symbol)
-        return symbol == active_trading_symbol and position_qty != 0
+        return symbol in active_trading_symbols and position_qty != 0
     
     return False
 
@@ -156,7 +158,7 @@ def check_signal():
 def main():
     try:
         logger.info("Starting trading bot...")
-        global active_trading_symbol
+        global active_trading_symbols, initial_cash
         while True:
             try:
                 signal_type, symbol = check_signal()
@@ -165,12 +167,17 @@ def main():
                     continue
                 
                 current_balance = get_us_balance()
+                
+                # Store initial cash when we start trading first symbol
+                if len(active_trading_symbols) == 0:
+                    initial_cash = current_balance
+                
                 current_price = get_current_price(symbol)
                 
                 # Check if we can trade this symbol
                 if signal_type and not can_trade_symbol(symbol, signal_type):
-                    logger.warning(f"Skipping {signal_type} signal for {symbol} - already trading {active_trading_symbol}")
-                    send_notification("Order Rejected", f"Cannot trade {symbol} - already trading {active_trading_symbol}", priority=0)
+                    logger.warning(f"Skipping {signal_type} signal for {symbol} - already trading {len(active_trading_symbols)} symbols: {', '.join(active_trading_symbols)}")
+                    send_notification("Order Rejected", f"Cannot trade {symbol} - already trading maximum allowed symbols: {', '.join(active_trading_symbols)}", priority=0)
                     time.sleep(POLLING_FREQUENCY)
                     continue
 
@@ -182,14 +189,17 @@ def main():
                     continue
 
                 if signal_type == 'BUY' and current_balance > 0:
-                    invest_amt = current_balance * INVEST_PERCENTAGE
+                    # Use initial cash for investment calculation
+                    invest_amt = initial_cash * INVEST_PERCENTAGE
+                    # But ensure we don't exceed available cash
+                    invest_amt = min(invest_amt, current_balance)
                     qty = round(invest_amt / current_price, 2)  # Allow fractional shares with 2 decimal points
                     if qty > 0:
                         logger.info(f"Buying {qty} shares of {symbol} at ${current_price:.2f}")
                         if place_us_order(symbol, qty, 'BUY'):
                             send_notification("BUY Signal", f"Bought {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
-                            # Set active symbol since we've opened a position
-                            active_trading_symbol = symbol
+                            # Add to active symbols since we've opened a position
+                            active_trading_symbols.add(symbol)
                 
                 elif signal_type == 'SELL':
                     qty = get_position_quantity(symbol)
@@ -197,21 +207,27 @@ def main():
                         logger.info(f"Selling {qty} shares of {symbol}")
                         if place_us_order(symbol, qty, 'SELL'):
                             send_notification("SELL Signal", f"Sold {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
-                            # Reset active symbol since we've closed the position
-                            active_trading_symbol = None
+                            # Remove from active symbols since we've closed the position
+                            active_trading_symbols.discard(symbol)
+                            # Reset initial cash if no more active symbols
+                            if len(active_trading_symbols) == 0:
+                                initial_cash = None
                     else:
                         logger.warning(f"No {symbol} available while trying to sell")
                         send_notification("Nothing to sell", f"No {symbol} available while trying to sell", priority=0)
 
                 elif signal_type == 'SHORT':
-                    invest_amt = current_balance * INVEST_PERCENTAGE
+                    # Use initial cash for investment calculation
+                    invest_amt = initial_cash * INVEST_PERCENTAGE
+                    # But ensure we don't exceed available cash
+                    invest_amt = min(invest_amt, current_balance)
                     qty = round(invest_amt / current_price, 2)  # Allow fractional shares with 2 decimal points
                     if qty > 0:
                         logger.info(f"Shorting {qty} shares of {symbol} at ${current_price:.2f}")
                         if place_us_order(symbol, qty, 'SELL'):  # Short is a SELL order
                             send_notification("SHORT Signal", f"Shorted {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
-                            # Set active symbol since we've opened a short position
-                            active_trading_symbol = symbol
+                            # Add to active symbols since we've opened a short position
+                            active_trading_symbols.add(symbol)
 
                 elif signal_type == 'COVER':
                     qty = abs(get_position_quantity(symbol))  # Get absolute value of short position
@@ -219,8 +235,11 @@ def main():
                         logger.info(f"Covering {qty} shares of {symbol}")
                         if place_us_order(symbol, qty, 'BUY'):  # Cover is a BUY order
                             send_notification("COVER Signal", f"Covered {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
-                            # Reset active symbol since we've closed the position
-                            active_trading_symbol = None
+                            # Remove from active symbols since we've closed the position
+                            active_trading_symbols.discard(symbol)
+                            # Reset initial cash if no more active symbols
+                            if len(active_trading_symbols) == 0:
+                                initial_cash = None
                     else:
                         logger.warning(f"No {symbol} short position available to cover")
                         send_notification("Nothing to cover", f"No {symbol} short position available to cover", priority=0)
