@@ -1,6 +1,5 @@
 import time
 import os
-import datetime
 from alpaca.trading.client import TradingClient
 from paging import send_notification
 from alpaca.trading.requests import MarketOrderRequest
@@ -14,7 +13,7 @@ logger = get_logger(__name__)
 
 # Constants
 MAX_CONCURRENT_SYMBOLS = 1  # Maximum number of concurrent active trading symbols
-INVEST_PERCENTAGE = 0.9 / MAX_CONCURRENT_SYMBOLS
+INVEST_PERCENTAGE = 0.95 / MAX_CONCURRENT_SYMBOLS
 API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
 ROBOT_NAME = os.getenv("ROBOT_NAME")
