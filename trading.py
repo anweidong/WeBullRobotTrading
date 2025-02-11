@@ -13,8 +13,8 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 # Constants
-MAX_CONCURRENT_SYMBOLS = 2  # Maximum number of concurrent active trading symbols
-INVEST_PERCENTAGE = 0.9 / MAX_CONCURRENT_SYMBOLS  # 45% of available balance per symbol
+MAX_CONCURRENT_SYMBOLS = 1  # Maximum number of concurrent active trading symbols
+INVEST_PERCENTAGE = 0.9 / MAX_CONCURRENT_SYMBOLS
 API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
 ROBOT_NAME = os.getenv("ROBOT_NAME")
@@ -272,5 +272,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    pass
+    main()
