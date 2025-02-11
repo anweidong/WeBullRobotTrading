@@ -74,6 +74,20 @@ def can_trade_symbol(symbol, signal_type):
     """Check if we can trade this symbol"""
     global active_trading_symbols
     
+    # Check account status for day trading restrictions
+    account = trading_client.get_account()
+    equity = float(account.equity)
+    daytrading_buying_power = float(account.daytrading_buying_power)
+    
+    # If equity is less than 25000 and daytrading_buying_power is zero, cannot trade
+    # https://www.finra.org/investors/investing/investment-products/stocks/day-trading
+    if equity < 25000 and daytrading_buying_power == 0:
+        logger.warning(f"Cannot trade: equity (${equity:.2f}) < $25000 and no daytrading buying power")
+        send_notification("Trading Restricted", 
+                        f"Cannot trade {symbol}: Account equity (${equity:.2f}) below $25,000 and no daytrading buying power", 
+                        priority=1)
+        return False
+    
     # For new positions (BUY/SHORT), only allow if we haven't reached max concurrent symbols
     if signal_type in ['BUY', 'SHORT']:
         if len(active_trading_symbols) < MAX_CONCURRENT_SYMBOLS:
@@ -176,8 +190,11 @@ def main():
                 
                 # Check if we can trade this symbol
                 if signal_type and not can_trade_symbol(symbol, signal_type):
-                    logger.warning(f"Skipping {signal_type} signal for {symbol} - already trading {len(active_trading_symbols)} symbols: {', '.join(active_trading_symbols)}")
-                    send_notification("Order Rejected", f"Cannot trade {symbol} - already trading maximum allowed symbols: {', '.join(active_trading_symbols)}", priority=0)
+                    # Note: Notification is now handled inside can_trade_symbol for equity/daytrading restrictions
+                    # Only send max symbols notification here
+                    if len(active_trading_symbols) >= MAX_CONCURRENT_SYMBOLS:
+                        logger.warning(f"Skipping {signal_type} signal for {symbol} - already trading {len(active_trading_symbols)} symbols: {', '.join(active_trading_symbols)}")
+                        send_notification("Order Rejected", f"Cannot trade {symbol} - already trading maximum allowed symbols: {', '.join(active_trading_symbols)}", priority=0)
                     time.sleep(POLLING_FREQUENCY)
                     continue
 
