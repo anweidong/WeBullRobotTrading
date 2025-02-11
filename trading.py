@@ -73,6 +73,12 @@ def get_position_quantity(symbol):
 def can_trade_symbol(symbol, signal_type):
     """Check if we can trade this symbol"""
     global active_trading_symbols
+
+    # For closing positions (SELL/COVER), only allow if it's in our active symbols
+    # and we have a position
+    if signal_type in ['SELL', 'COVER']:
+        position_qty = get_position_quantity(symbol)
+        return symbol in active_trading_symbols and position_qty != 0
     
     # Check account status for day trading restrictions
     account = trading_client.get_account()
@@ -85,7 +91,7 @@ def can_trade_symbol(symbol, signal_type):
         logger.warning(f"Cannot trade: equity (${equity:.2f}) < $25000 and no daytrading buying power")
         send_notification("Trading Restricted", 
                         f"Cannot trade {symbol}: Account equity (${equity:.2f}) below $25,000 and no daytrading buying power", 
-                        priority=1)
+                        priority=0)
         return False
     
     # For new positions (BUY/SHORT), only allow if we haven't reached max concurrent symbols
@@ -93,12 +99,6 @@ def can_trade_symbol(symbol, signal_type):
         if len(active_trading_symbols) < MAX_CONCURRENT_SYMBOLS:
             return True
         return False
-    
-    # For closing positions (SELL/COVER), only allow if it's in our active symbols
-    # and we have a position
-    if signal_type in ['SELL', 'COVER']:
-        position_qty = get_position_quantity(symbol)
-        return symbol in active_trading_symbols and position_qty != 0
     
     return False
 
@@ -272,4 +272,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    pass
