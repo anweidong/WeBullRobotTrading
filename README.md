@@ -1,10 +1,10 @@
 # WeBull Robot Trading
 
-An automated trading bot that monitors Gmail for WeBull trading signals and executes trades automatically through Alpaca Markets.
+An automated trading bot that monitors Gmail for Alpaca trading signals and executes trades automatically through Alpaca Markets.
 
 ## Features
 
-- Monitors Gmail for specific trading signals from WeBull
+- Monitors Gmail for specific trading signals from Alpaca
 - Automatically executes trades on Alpaca Markets based on signals
 - Supports both BUY and SELL orders
 - Real-time price quotes through Alpaca Data API
@@ -24,7 +24,7 @@ An automated trading bot that monitors Gmail for WeBull trading signals and exec
    ```bash
    ALPACA_API_KEY=your_alpaca_api_key
    ALPACA_API_SECRET=your_alpaca_secret_key
-   ROBOT_NAME="Day Trader: Price Action Bot for High Volatility and High Liquidity Stocks (TA)"
+   ROBOT_NAME="your_robot_name"
    ```
 
 2. Set up Google Cloud Project and Gmail API:

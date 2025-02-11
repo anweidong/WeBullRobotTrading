@@ -188,6 +188,8 @@ def main():
                         logger.info(f"Buying {qty} shares of {symbol} at ${current_price:.2f}")
                         if place_us_order(symbol, qty, 'BUY'):
                             send_notification("BUY Signal", f"Bought {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
+                            # Set active symbol since we've opened a position
+                            active_trading_symbol = symbol
                 
                 elif signal_type == 'SELL':
                     qty = get_position_quantity(symbol)
