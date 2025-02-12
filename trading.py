@@ -175,7 +175,6 @@ def main():
         while True:
             try:
                 signal_type, symbol = check_signal()
-                print(signal_type, symbol)
                 if signal_type is None:
                     time.sleep(POLLING_FREQUENCY)
                     continue
