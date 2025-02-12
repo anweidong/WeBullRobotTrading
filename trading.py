@@ -175,6 +175,7 @@ def main():
         while True:
             try:
                 signal_type, symbol = check_signal()
+                print(signal_type, symbol)
                 if signal_type is None:
                     time.sleep(POLLING_FREQUENCY)
                     continue
@@ -194,6 +195,9 @@ def main():
                     if len(active_trading_symbols) >= MAX_CONCURRENT_SYMBOLS:
                         logger.warning(f"Skipping {signal_type} signal for {symbol} - already trading {len(active_trading_symbols)} symbols: {', '.join(active_trading_symbols)}")
                         send_notification("Order Rejected", f"Cannot trade {symbol} - already trading maximum allowed symbols: {', '.join(active_trading_symbols)}", priority=0)
+                    else:
+                        logger.warning(f"Skipping {signal_type} signal for {symbol} - not actively trading or account has no position")
+                        send_notification("Order Rejected", f"Cannot trade {symbol} - not actively trading or account has no position", priority=0)
                     time.sleep(POLLING_FREQUENCY)
                     continue
 
