@@ -237,9 +237,9 @@ def main():
                     invest_amt = initial_cash * INVEST_PERCENTAGE
                     # But ensure we don't exceed available cash
                     invest_amt = min(invest_amt, current_balance)
-                    qty = round(invest_amt / current_price, 2)  # Allow fractional shares with 2 decimal points
+                    qty = int(invest_amt / current_price)  # No fractional shares for SHORT
                     if qty > 0:
-                        logger.info(f"Shorting {qty} shares of {symbol} at ${current_price:.2f}")
+                        logger.info(f"Shorting {qty} whole shares of {symbol} at ${current_price:.2f}")
                         if place_us_order(symbol, qty, 'SELL'):  # Short is a SELL order
                             send_notification("SHORT Signal", f"Shorted {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
                             # Add to active symbols since we've opened a short position
