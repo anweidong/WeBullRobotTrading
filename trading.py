@@ -38,7 +38,11 @@ def get_current_price(symbol):
     """Get real-time price using latest quote"""
     request = StockLatestQuoteRequest(symbol_or_symbols=[symbol])
     quotes = data_client.get_stock_latest_quote(request)
-    return float(quotes[symbol].ask_price)
+    ask_price = float(quotes[symbol].ask_price)
+    # If ask_price is 0, use bid_price instead
+    if ask_price == 0:
+        return float(quotes[symbol].bid_price)
+    return ask_price
 
 def place_us_order(symbol, qty, side):
     """Place a market order"""
