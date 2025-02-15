@@ -6,6 +6,7 @@ export ALPACA_API_KEY=""
 export ALPACA_API_SECRET=""
 
 export ROBOT_NAME=""
+export SHORT_ENABLED="true"
 
 # Start the trading script
 python3 trading.py

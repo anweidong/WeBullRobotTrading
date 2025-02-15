@@ -17,6 +17,7 @@ INVEST_PERCENTAGE = 0.95 / MAX_CONCURRENT_SYMBOLS
 API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
 ROBOT_NAME = os.getenv("ROBOT_NAME")
+SHORT_ENABLED = os.getenv('SHORT_ENABLED', 'true').lower() == 'true'
 
 POLLING_FREQUENCY = 0.5  # sec
 
@@ -176,6 +177,13 @@ def main():
             try:
                 signal_type, symbol = check_signal()
                 if signal_type is None:
+                    time.sleep(POLLING_FREQUENCY)
+                    continue
+
+                # Check if shorting is enabled for SHORT and COVER operations
+                if signal_type in ['SHORT', 'COVER'] and not SHORT_ENABLED:
+                    logger.warning(f"Skipping {signal_type} signal for {symbol} - shorting is disabled")
+                    send_notification("Order Rejected", f"Cannot {signal_type} {symbol} - shorting is disabled", priority=0)
                     time.sleep(POLLING_FREQUENCY)
                     continue
                 
