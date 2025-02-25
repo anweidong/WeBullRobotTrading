@@ -12,7 +12,7 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 # Constants
-MAX_CONCURRENT_SYMBOLS = 5  # Maximum number of concurrent active trading symbols
+MAX_CONCURRENT_SYMBOLS = 6  # Maximum number of concurrent active trading symbols
 INVEST_PERCENTAGE = 0.95 / MAX_CONCURRENT_SYMBOLS
 API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
@@ -30,9 +30,9 @@ trading_client = TradingClient(API_KEY, API_SECRET, paper=False)
 data_client = StockHistoricalDataClient(API_KEY, API_SECRET)
 
 def get_us_balance():
-    """Fetch paper account balance"""
+    """Fetch account buying power"""
     account = trading_client.get_account()
-    return float(account.cash)
+    return float(account.buying_power)
 
 def get_current_price(symbol):
     """Get real-time price using latest quote"""
