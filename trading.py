@@ -12,8 +12,8 @@ from logger import get_logger
 logger = get_logger(__name__)
 
 # Constants
-MAX_CONCURRENT_SYMBOLS = 6  # Maximum number of concurrent active trading symbols
-INVEST_PERCENTAGE = 0.95 / MAX_CONCURRENT_SYMBOLS
+MAX_CONCURRENT_SYMBOLS = 9  # Maximum number of concurrent active trading symbols
+INVEST_PERCENTAGE = 0.99 / MAX_CONCURRENT_SYMBOLS
 API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
 ROBOT_NAME = os.getenv("ROBOT_NAME")
@@ -22,17 +22,17 @@ SHORT_ENABLED = os.getenv('SHORT_ENABLED', 'true').lower() == 'true'
 POLLING_FREQUENCY = 0.5  # sec
 
 processed_gmail_message = set()
-active_trading_symbols = set()  # Track which stocks we're currently trading
-initial_cash = None  # Store initial cash balance when we start trading
+active_trading_symbols = {"TSM", "NVDS", "DUG", "NVDA"}  # Track which stocks we're currently trading
+initial_cash = 25000  # Store initial cash balance when we start trading
 
 # Initialize Alpaca clients
 trading_client = TradingClient(API_KEY, API_SECRET, paper=False)
 data_client = StockHistoricalDataClient(API_KEY, API_SECRET)
 
 def get_us_balance():
-    """Fetch account buying power"""
+    """Fetch account cash"""
     account = trading_client.get_account()
-    return float(account.buying_power)
+    return float(account.cash)
 
 def get_current_price(symbol):
     """Get real-time price using latest quote"""
@@ -91,12 +91,12 @@ def can_trade_symbol(symbol, signal_type):
     
     # If equity is less than 25000 and daytrading_buying_power is zero, cannot trade
     # https://www.finra.org/investors/investing/investment-products/stocks/day-trading
-    if equity < 25000 and daytrading_buying_power == 0:
-        logger.warning(f"Cannot trade: equity (${equity:.2f}) < $25000 and no daytrading buying power")
-        send_notification("Trading Restricted", 
-                        f"Cannot trade {symbol}: Account equity (${equity:.2f}) below $25,000 and no daytrading buying power", 
-                        priority=0)
-        return False
+    # if equity < 25000 and daytrading_buying_power == 0:
+    #     logger.warning(f"Cannot trade: equity (${equity:.2f}) < $25000 and no daytrading buying power")
+    #     send_notification("Trading Restricted", 
+    #                     f"Cannot trade {symbol}: Account equity (${equity:.2f}) below $25,000 and no daytrading buying power", 
+    #                     priority=0)
+    #     return False
     
     # For new positions (BUY/SHORT), only allow if we haven't reached max concurrent symbols
     if signal_type in ['BUY', 'SHORT']:
@@ -224,7 +224,7 @@ def main():
                     invest_amt = initial_cash * INVEST_PERCENTAGE
                     # But ensure we don't exceed available cash
                     invest_amt = min(invest_amt, current_balance)
-                    qty = round(invest_amt / current_price, 2)  # Allow fractional shares with 2 decimal points
+                    qty = int(invest_amt / current_price)
                     if qty > 0:
                         logger.info(f"Buying {qty} shares of {symbol} at ${current_price:.2f}")
                         if place_us_order(symbol, qty, 'BUY'):
