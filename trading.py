@@ -1,5 +1,6 @@
 import time
 import os
+from collections import deque
 from alpaca.trading.client import TradingClient
 from paging import send_notification
 from alpaca.trading.requests import MarketOrderRequest
@@ -22,8 +23,13 @@ SHORT_ENABLED = os.getenv('SHORT_ENABLED', 'true').lower() == 'true'
 POLLING_FREQUENCY = 0.5  # sec
 
 processed_gmail_message = set()
-active_trading_symbols = {"TSM", "NVDS", "DUG", "NVDA"}  # Track which stocks we're currently trading
-initial_cash = 25000  # Store initial cash balance when we start trading
+active_trading_symbols = {
+    "TSM": deque(),
+    "NVDS": deque(),
+    "DUG": deque(),
+    "NVDA": deque()
+}  # Track which stocks we're currently trading and their share quantities
+initial_cash = 23000  # Store initial cash balance when we start trading
 
 # Initialize Alpaca clients
 trading_client = TradingClient(API_KEY, API_SECRET, paper=False)
@@ -230,19 +236,34 @@ def main():
                         if place_us_order(symbol, qty, 'BUY'):
                             send_notification("BUY Signal", f"Bought {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
                             # Add to active symbols since we've opened a position
-                            active_trading_symbols.add(symbol)
+                            if symbol not in active_trading_symbols:
+                                active_trading_symbols[symbol] = deque()
+                            # Enqueue the number of shares bought
+                            active_trading_symbols[symbol].append(qty)
                 
                 elif signal_type == 'SELL':
-                    qty = get_position_quantity(symbol)
-                    if qty > 0:
-                        logger.info(f"Selling {qty} shares of {symbol}")
-                        if place_us_order(symbol, qty, 'SELL'):
-                            send_notification("SELL Signal", f"Sold {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
-                            # Remove from active symbols since we've closed the position
-                            active_trading_symbols.discard(symbol)
-                            # Reset initial cash if no more active symbols
-                            if len(active_trading_symbols) == 0:
-                                initial_cash = None
+                    if symbol in active_trading_symbols and active_trading_symbols[symbol]:
+                        # Dequeue to determine how many shares to sell
+                        qty_to_sell = active_trading_symbols[symbol].popleft()
+                        # Check if we have enough shares in the position
+                        position_qty = get_position_quantity(symbol)
+                        qty_to_sell = min(qty_to_sell, position_qty)
+                        
+                        if qty_to_sell > 0:
+                            logger.info(f"Selling {qty_to_sell} shares of {symbol}")
+                            if place_us_order(symbol, qty_to_sell, 'SELL'):
+                                send_notification("SELL Signal", f"Sold {qty_to_sell} shares of {symbol} at ${current_price:.2f}", priority=0)
+                                
+                                # If no more shares in queue, remove from active symbols
+                                if not active_trading_symbols[symbol]:
+                                    del active_trading_symbols[symbol]
+                                
+                                # Reset initial cash if no more active symbols
+                                if len(active_trading_symbols) == 0:
+                                    initial_cash = None
+                        else:
+                            logger.warning(f"No {symbol} available while trying to sell")
+                            send_notification("Nothing to sell", f"No {symbol} available while trying to sell", priority=0)
                     else:
                         logger.warning(f"No {symbol} available while trying to sell")
                         send_notification("Nothing to sell", f"No {symbol} available while trying to sell", priority=0)
@@ -258,19 +279,34 @@ def main():
                         if place_us_order(symbol, qty, 'SELL'):  # Short is a SELL order
                             send_notification("SHORT Signal", f"Shorted {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
                             # Add to active symbols since we've opened a short position
-                            active_trading_symbols.add(symbol)
+                            if symbol not in active_trading_symbols:
+                                active_trading_symbols[symbol] = deque()
+                            # Enqueue the number of shares shorted
+                            active_trading_symbols[symbol].append(qty)
 
                 elif signal_type == 'COVER':
-                    qty = abs(get_position_quantity(symbol))  # Get absolute value of short position
-                    if qty > 0:
-                        logger.info(f"Covering {qty} shares of {symbol}")
-                        if place_us_order(symbol, qty, 'BUY'):  # Cover is a BUY order
-                            send_notification("COVER Signal", f"Covered {qty} shares of {symbol} at ${current_price:.2f}", priority=0)
-                            # Remove from active symbols since we've closed the position
-                            active_trading_symbols.discard(symbol)
-                            # Reset initial cash if no more active symbols
-                            if len(active_trading_symbols) == 0:
-                                initial_cash = None
+                    if symbol in active_trading_symbols and active_trading_symbols[symbol]:
+                        # Dequeue to determine how many shares to cover
+                        qty_to_cover = active_trading_symbols[symbol].popleft()
+                        # Check if we have enough shares in the short position
+                        position_qty = abs(get_position_quantity(symbol))
+                        qty_to_cover = min(qty_to_cover, position_qty)
+                        
+                        if qty_to_cover > 0:
+                            logger.info(f"Covering {qty_to_cover} shares of {symbol}")
+                            if place_us_order(symbol, qty_to_cover, 'BUY'):  # Cover is a BUY order
+                                send_notification("COVER Signal", f"Covered {qty_to_cover} shares of {symbol} at ${current_price:.2f}", priority=0)
+                                
+                                # If no more shares in queue, remove from active symbols
+                                if not active_trading_symbols[symbol]:
+                                    del active_trading_symbols[symbol]
+                                
+                                # Reset initial cash if no more active symbols
+                                if len(active_trading_symbols) == 0:
+                                    initial_cash = None
+                        else:
+                            logger.warning(f"No {symbol} short position available to cover")
+                            send_notification("Nothing to cover", f"No {symbol} short position available to cover", priority=0)
                     else:
                         logger.warning(f"No {symbol} short position available to cover")
                         send_notification("Nothing to cover", f"No {symbol} short position available to cover", priority=0)
