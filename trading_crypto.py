@@ -20,6 +20,7 @@ from typing import Tuple, Optional
 from binance.error import ClientError
 from binance.um_futures import UMFutures             # USDT-M Perpetual Interface  :contentReference[oaicite:0]{index=0}
 
+from paging import send_notification
 from utils import check_signal
 
 ###############################################################################
@@ -105,6 +106,7 @@ def open_long(symbol: str, margin_usdt: Decimal):
                      type="MARKET",
                      quantity=qty_str,
                      newOrderRespType="RESULT")
+    send_notification("BUY Signal", f"Opened long position for {symbol} with {margin_usdt} USDT * {LEV}x leverage", priority=0)
 
 
 def close_position(symbol: str):
@@ -118,6 +120,7 @@ def close_position(symbol: str):
                      type="MARKET",
                      quantity=str(abs(qty)),
                      reduceOnly="true")     # Prevent reverse position
+    send_notification("SELL Signal", f"Closed position for {symbol} with quantity {abs(qty)}", priority=0)
 
 
 ###############################################################################
@@ -146,7 +149,9 @@ def main():
                 free_usdt = get_free_usdt()
                 alloc = calc_allocation(free_usdt)
                 if alloc < Decimal("10"):
-                    logger.warning("Free balance too low, skip BUY")
+                    msg = f"Free balance too low (${alloc}), skip BUY"
+                    logger.warning(msg)
+                    send_notification("Low Balance Warning", msg, priority=0)
                     continue
                 open_long(symbol, alloc)
 
@@ -157,9 +162,13 @@ def main():
                 close_position(symbol)
 
         except ClientError as ce:
-            logger.error(f"Binance API error {ce.error_code}: {ce.error_message}")
+            msg = f"Binance API error {ce.error_code}: {ce.error_message}"
+            logger.error(msg)
+            send_notification("ERROR Trading", msg, priority=1)
         except Exception as exc:
+            msg = str(exc)
             logger.exception(exc)
+            send_notification("ERROR Trading", msg, priority=1)
 
         time.sleep(POLL_SECS)
 
