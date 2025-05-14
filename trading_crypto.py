@@ -10,7 +10,34 @@ ETH / XRP Perpetual-Futures bot (Binance UM)
     LEVERAGE                     –  default 10
     ALLOCATION_PCT               –  default 0.06   (6%)
 """
+# Suppress all oauth2client related warnings
+import warnings
 import logging
+import os
+
+# Completely disable warnings
+warnings.filterwarnings('ignore')
+
+# Set environment variable to disable oauth2client cache warnings
+os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
+
+# Configure logging to suppress specific messages
+class SuppressFilter(logging.Filter):
+    def filter(self, record):
+        # Filter out oauth2client related messages
+        if 'oauth2client' in record.getMessage():
+            return False
+        if 'file_cache' in record.getMessage():
+            return False
+        return True
+
+# Apply filter to all loggers
+for name in logging.root.manager.loggerDict:
+    logger = logging.getLogger(name)
+    logger.addFilter(SuppressFilter())
+
+# Apply filter to root logger
+logging.getLogger().addFilter(SuppressFilter())
 import math
 import os
 import time
@@ -45,15 +72,27 @@ client = UMFutures(key=API_KEY, secret=API_SECRET)   # HMAC Authentication  :con
 def get_free_usdt() -> Decimal:
     """Available USDT balance (excluding position margin)"""
     balances = client.balance()          # Returns list
-    print(balances)
     bal = next(b for b in balances if b["asset"] == "USDT")
     return Decimal(bal["balance"])
 
 
-def position_size(symbol: str) -> Decimal:
-    """Current position size (>0 for long, <0 for short, 0 for no position)"""
-    pos = client.get_position_risk(symbol=symbol)[0]
-    return Decimal(pos["positionAmt"])      # Position unit: coin
+def position_size(symbol: str, position_side: str = None) -> Decimal:
+    """
+    Current position size (>0 for long, <0 for short, 0 for no position)
+    If position_side is specified, returns size for that specific position side
+    """
+    try:
+        positions = client.get_position_risk(symbol=symbol)
+        if position_side:
+            # Filter for the specific position side
+            pos = next((p for p in positions if p["positionSide"] == position_side), None)
+            return Decimal(pos["positionAmt"]) if pos else Decimal(0)
+        else:
+            # Default behavior for backward compatibility
+            return Decimal(positions[0]["positionAmt"])
+    except (IndexError, StopIteration):
+        return Decimal(0)
+    
 
 
 def round_step(value: Decimal, step: Decimal) -> str:
@@ -75,7 +114,7 @@ def calc_allocation(free_balance: Decimal) -> Decimal:
     - No positions: free_balance * ALLOC_PCT
     - With positions: Adjusts allocation based on number of existing positions
     """
-    position_count = sum(1 for sym in SYMBOLS.values() if position_size(sym) > 0)
+    position_count = sum(1 for sym in SYMBOLS.values() if position_size(sym, "LONG") > 0)
     denominator = Decimal("1") - ALLOC_PCT * position_count
     return (free_balance * ALLOC_PCT).quantize(
         Decimal("0.01"), rounding=ROUND_DOWN
@@ -105,13 +144,14 @@ def open_long(symbol: str, margin_usdt: Decimal):
                      side="BUY",
                      type="MARKET",
                      quantity=qty_str,
+                     positionSide="LONG",
                      newOrderRespType="RESULT")
     send_notification("BUY Signal", f"Opened long position for {symbol} with {margin_usdt} USDT * {LEV}x leverage", priority=0)
 
 
 def close_position(symbol: str):
     """Close all long positions at market price"""
-    qty = position_size(symbol)
+    qty = position_size(symbol, "LONG")
     if qty == 0:
         return
     logger.info(f"SELL {symbol} qty={abs(qty)}  (Close)")
@@ -119,7 +159,7 @@ def close_position(symbol: str):
                      side="SELL",
                      type="MARKET",
                      quantity=str(abs(qty)),
-                     reduceOnly="true")     # Prevent reverse position
+                     positionSide="LONG")
     send_notification("SELL Signal", f"Closed position for {symbol} with quantity {abs(qty)}", priority=0)
 
 
@@ -140,7 +180,7 @@ def main():
                 continue
 
             symbol = SYMBOLS[asset]
-            have_pos = position_size(symbol) > 0
+            have_pos = position_size(symbol, "LONG") > 0
 
             if signal_type == "BUY":
                 if have_pos:
@@ -148,7 +188,7 @@ def main():
                     continue
                 free_usdt = get_free_usdt()
                 alloc = calc_allocation(free_usdt)
-                if alloc < Decimal("10"):
+                if alloc < Decimal("0.5"):
                     msg = f"Free balance too low (${alloc}), skip BUY"
                     logger.warning(msg)
                     send_notification("Low Balance Warning", msg, priority=0)
