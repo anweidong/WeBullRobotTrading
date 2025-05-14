@@ -4,3 +4,5 @@ google-api-python-client>=2.0.0
 pytz>=2024.1
 alpaca-py>=0.8.0
 python-dotenv>=0.19.0
+binance-futures-connector
+python-decouple

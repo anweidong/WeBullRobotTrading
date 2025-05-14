@@ -17,12 +17,10 @@ MAX_CONCURRENT_SYMBOLS = 9  # Maximum number of concurrent active trading symbol
 INVEST_PERCENTAGE = 0.99 / MAX_CONCURRENT_SYMBOLS
 API_KEY = os.getenv('ALPACA_API_KEY')
 API_SECRET = os.getenv('ALPACA_API_SECRET')
-ROBOT_NAME = os.getenv("ROBOT_NAME")
 SHORT_ENABLED = os.getenv('SHORT_ENABLED', 'true').lower() == 'true'
 
 POLLING_FREQUENCY = 0.5  # sec
 
-processed_gmail_message = set()
 active_trading_symbols = {
     "TSM": deque(),
     "NVDS": deque(),
@@ -121,63 +119,7 @@ def has_pending_orders():
         logger.error(f"Error checking pending orders: {e}")
         return False
     
-def check_signal():
-    messages = process_messages()[::-1]  # Get all messages within 2 minutes
-    global processed_gmail_message
-    for msg in messages:
-        if msg['id'] in processed_gmail_message:
-            continue
-        
-        # Clean message body by removing extra spaces and newlines
-        cleaned_body = ' '.join(msg["body"].strip().splitlines())
-        if ROBOT_NAME in cleaned_body:
-            message = cleaned_body.lower()
-            
-            # Check for buy signal
-            if "bought" in message and "at" in message:
-                # Extract symbol - assuming format "bought X SYMBOL shares at"
-                words = message.split()
-                for i, word in enumerate(words):
-                    if word == "bought":
-                        symbol = words[i + 2].upper()  # Get the word after the quantity
-                        processed_gmail_message.add(msg['id'])
-                        return "BUY", symbol
-            
-            # Check for sell signal
-            elif "sold to close" in message and "at" in message:
-                # Extract symbol - assuming format "sold to close X SYMBOL shares at"
-                words = message.split()
-                for i, word in enumerate(words):
-                    if word == "close":
-                        symbol = words[i + 2].upper()  # Get the word after the quantity
-                        processed_gmail_message.add(msg['id'])
-                        return "SELL", symbol
-
-            # Check for short signal
-            elif "shorted" in message and "at" in message:
-                # Extract symbol - assuming format "shorted X SYMBOL shares at"
-                words = message.split()
-                for i, word in enumerate(words):
-                    if word == "shorted":
-                        symbol = words[i + 2].upper()  # Get the word after the quantity
-                        processed_gmail_message.add(msg['id'])
-                        return "SHORT", symbol
-
-            # Check for cover signal
-            elif "covered to close" in message and "at" in message:
-                # Extract symbol - assuming format "covered to close X SYMBOL shares at"
-                words = message.split()
-                for i, word in enumerate(words):
-                    if word == "close":
-                        symbol = words[i + 2].upper()  # Get the word after the quantity
-                        processed_gmail_message.add(msg['id'])
-                        return "COVER", symbol
-            
-            # Mark message as processed even if it doesn't contain a valid signal
-            processed_gmail_message.add(msg['id'])
-    
-    return None, None
-
+from utils import check_signal
 
 def main():
     try:
