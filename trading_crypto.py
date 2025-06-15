@@ -133,7 +133,7 @@ def open_long(size_usd: Decimal, tick_size: Decimal):
     """
     try:
         price = get_market_price()
-        size_eth = (size_usd / price).quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
+        size_eth = (size_usd * LEVERAGE / price).quantize(Decimal("0.0001"), rounding=ROUND_DOWN)
 
         min_size = Decimal("0.001")
         if size_eth < min_size:
