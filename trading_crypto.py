@@ -106,7 +106,7 @@ def get_account_value() -> Decimal:
     Retrieve total account value in USD from clearinghouse state.
     """
     state = info.user_state(MASTER_WALLET)
-    account_value_str = state["crossMaintenanceMarginUsed"]["withdrawable"]
+    account_value_str = state["withdrawable"]
     return Decimal(str(account_value_str))
 
 
@@ -304,4 +304,4 @@ def main():
 
 
 if __name__ == "__main__":
-    print(get_account_value())
+    main()
