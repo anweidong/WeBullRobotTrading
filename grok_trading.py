@@ -5,9 +5,9 @@ from typing import Literal
 
 # 1️⃣ LLM clients ---------------------------------------------------
 grok_analysis = ChatXAI(                      # Grok-4 with Live Search
-    model="grok-4-latest",
+    model="grok-3-mini-fast",
     search_parameters={"mode": "on"},
-    temperature=0.7,
+    temperature=0.3,
 )
 
 class Decision(BaseModel):
@@ -15,7 +15,7 @@ class Decision(BaseModel):
     reason: constr(max_length=120)
 
 grok_json = ChatXAI(                          # Grok-3, no search
-    model="grok-3-latest",
+    model="grok-3-mini-fast",
     temperature=0.3,
 ).with_structured_output(Decision, method="json_mode")
 
@@ -26,12 +26,43 @@ class TradeState(BaseModel):
     reason: str | None = None
 
 # 3️⃣ Node 1 – run your prompt -------------------------------------
-user_prompt = (
-    "I am trading BTC with leverage (10x) in very short-term period. "
-    "Will take profit when the price change 0.5%. "
-    "Could you study the current market now (indicators/sentiments etc) and "
-    "give me a simple binary suggestion: whether I should long or short if I enter *right now*?"
-)
+user_prompt = """
+You are an expert cryptocurrency trading analyst with deep knowledge of market dynamics, technical analysis, and sentiment analysis. Your role is to provide precise, actionable trading recommendations for high-frequency, leveraged Bitcoin trading.
+
+CURRENT CONTEXT:
+- Asset: Bitcoin (BTC)
+- Trading Style: High-frequency, leveraged trading (10x leverage)
+- Profit Target: 0.5% price movement
+- Time Horizon: Very short-term (minutes to hours)
+- Current Time: Please check the current date and time
+
+REQUIRED ANALYSIS STEPS:
+1. GET LATEST DATA: First, obtain the current BTC price, recent price action, and timestamp
+2. TECHNICAL ANALYSIS: Analyze key indicators (RSI, MACD, moving averages, support/resistance levels)
+3. MARKET SENTIMENT: Check current market sentiment, news, social media trends, and fear/greed index
+4. VOLUME ANALYSIS: Examine trading volume patterns and liquidity
+5. MACRO FACTORS: Consider any relevant macroeconomic events or announcements
+6. RISK ASSESSMENT: Evaluate current market volatility and potential risks
+
+TRADING PARAMETERS:
+- Using 10x leverage means 0.5% price movement = 5% profit/loss
+- Need to account for fees and slippage
+- Must consider liquidation risks with leverage
+- Focus on immediate market conditions (next 1-6 hours)
+
+OUTPUT REQUIREMENT:
+Based on your comprehensive analysis of current market conditions, provide a clear binary recommendation: should I go LONG or SHORT on BTC *right now*?
+
+Include in your analysis:
+- Current BTC price and recent price action
+- Key technical levels and indicators
+- Market sentiment and news impact
+- Volume and liquidity conditions
+- Risk factors and confidence level
+- Specific entry reasoning for the recommended direction
+
+Please conduct this analysis now using the most current market data available.
+"""
 
 def analyze_market(state: TradeState) -> dict:
     reply = grok_analysis.invoke(user_prompt)
@@ -39,10 +70,11 @@ def analyze_market(state: TradeState) -> dict:
 
 # 4️⃣ Node 2 – squeeze to JSON -------------------------------------
 compress_tpl = """
-Based **only** on the analysis below, output JSON exactly matching:
+Based **only** on the comprehensive analysis below, extract the key trading decision and reasoning. 
+Output JSON exactly matching this format:
 {{
   "decision": "long" | "short",
-  "reason": "<≤120-char explanation>"
+  "reason": "<≤120-char explanation including price level, key indicator, or catalyst>"
 }}
 
 Analysis:
