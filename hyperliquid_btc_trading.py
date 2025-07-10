@@ -168,12 +168,14 @@ def open_position(is_long: bool, size_usd: Decimal, tick_size: Decimal):
                 raise ValueError(f"Main order failed: {status['error']}")
 
         # Calculate take profit and stop loss prices
+        _, entry_price = get_current_position()
+        entry_price = Decimal(str(int(entry_price)))
         if is_long:
-            tp_price = market_price * (Decimal("1") + TAKE_PROFIT_PCT)
-            sl_price = market_price * (Decimal("1") - STOP_LOSS_PCT)
+            tp_price = entry_price * (Decimal("1") + TAKE_PROFIT_PCT)
+            sl_price = entry_price * (Decimal("1") - STOP_LOSS_PCT)
         else:
-            tp_price = market_price * (Decimal("1") - TAKE_PROFIT_PCT)
-            sl_price = market_price * (Decimal("1") + STOP_LOSS_PCT)
+            tp_price = entry_price * (Decimal("1") - TAKE_PROFIT_PCT)
+            sl_price = entry_price * (Decimal("1") + STOP_LOSS_PCT)
             
         tp_price = round_to_tick_size(tp_price, tick_size)
         sl_price = round_to_tick_size(sl_price, tick_size)
