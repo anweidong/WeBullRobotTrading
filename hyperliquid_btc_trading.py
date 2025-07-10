@@ -302,7 +302,7 @@ def main():
                 reason = result.get("reason", "No reason provided")
                 analysis = result.get("analysis", "No analysis")
                 
-                logger.info(f"Grok decision: {decision.upper()} - {reason}")
+                logger.info(f"Grok decision: {decision.upper()} - {reason} - {analysis}")
                 
                 # Get account value to determine position size
                 account_value = get_account_value()
