@@ -2,11 +2,13 @@ from langchain_xai import ChatXAI
 from langgraph.graph import StateGraph, END
 from pydantic import BaseModel, constr
 from typing import Literal
+from datetime import datetime, UTC
+import json
+from btc_helper import get_btc_snapshot_alt
 
 # 1️⃣ LLM clients ---------------------------------------------------
 grok_analysis = ChatXAI(                      # Grok-4 with Live Search
     model="grok-3-mini-fast",
-    search_parameters={"mode": "on"},
     temperature=0.3,
 )
 
@@ -26,46 +28,46 @@ class TradeState(BaseModel):
     reason: str | None = None
 
 # 3️⃣ Node 1 – run your prompt -------------------------------------
-user_prompt = """
-You are an expert cryptocurrency trading analyst with deep knowledge of market dynamics, technical analysis, and sentiment analysis. Your role is to provide precise, actionable trading recommendations for high-frequency, leveraged Bitcoin trading.
+user_prompt_template = """
+You are an expert cryptocurrency trading analyst with deep knowledge of market dynamics, technical analysis, and sentiment analysis.  
+Your task is to deliver a precise, binary trading recommendation (LONG / SHORT) for high-frequency, 10×-leveraged Bitcoin trades entering *right now*. Give the analysis.
 
-CURRENT CONTEXT:
+CURRENT CONTEXT
 - Asset: Bitcoin (BTC)
-- Trading Style: High-frequency, leveraged trading (10x leverage)
-- Profit Target: 0.5% price movement
-- Time Horizon: Very short-term (minutes to hours)
-- Current Time: Please check the current date and time
+- Trading style: High-frequency, 10× leverage
+- Profit target: 0.3 % price move (≈ 3 % P&L with leverage)
+- Time horizon: Minutes to hours
+- Current UTC timestamp: {timestamp}
 
-REQUIRED ANALYSIS STEPS:
-1. GET LATEST DATA: First, obtain the current BTC price, recent price action, and timestamp
-2. TECHNICAL ANALYSIS: Analyze key indicators (RSI, MACD, moving averages, support/resistance levels)
-3. MARKET SENTIMENT: Check current market sentiment, news, social media trends, and fear/greed index
-4. VOLUME ANALYSIS: Examine trading volume patterns and liquidity
-5. MACRO FACTORS: Consider any relevant macroeconomic events or announcements
-6. RISK ASSESSMENT: Evaluate current market volatility and potential risks
+PRE-FETCHED MARKET SNAPSHOT  
+```json
+{snapshot_json}
+```
 
-TRADING PARAMETERS:
-- Using 10x leverage means 0.5% price movement = 5% profit/loss
-- Need to account for fees and slippage
-- Must consider liquidation risks with leverage
-- Focus on immediate market conditions (next 1-6 hours)
+FIELD MEANINGS
 
-OUTPUT REQUIREMENT:
-Based on your comprehensive analysis of current market conditions, provide a clear binary recommendation: should I go LONG or SHORT on BTC *right now*?
+btc_spot_price — last traded spot price (USD)
+price_change_pct_[1m|5m|15m] — momentum over rolling windows
+ema9_1m, ema21_1m — fast / slow micro-trend averages
+rsi_fast (7-period, 1 m) & rsi_standard (14-period, 5 m) — momentum gauges
+macd_1m — MACD line value (12/26/9)
+atr14_1m — 14-period ATR for volatility / stop sizing
+vol_sma20_1m — 20-bar volume average
+order_book_spread_pct — top-of-book bid/ask spread (%)
+funding_rate — latest perp funding (sentiment-lite)
+long_short_ratio — exchange-wide positioning bias (sentiment-lite)
 
-Include in your analysis:
-- Current BTC price and recent price action
-- Key technical levels and indicators
-- Market sentiment and news impact
-- Volume and liquidity conditions
-- Risk factors and confidence level
-- Specific entry reasoning for the recommended direction
+ANALYSIS CHECKLIST
 
-Please conduct this analysis now using the most current market data available.
+Trend & momentum: Examine EMA cross, MACD, RSI.
+Volatility & liquidity: Confirm ATR and spread are compatible with a 0.3% scalp.
+Sentiment bias: Funding rate & long/short ratio for crowd positioning.
+Risk assessment: Note liquidation distance at 10× and any red flags in spread/ATR.
 """
 
 def analyze_market(state: TradeState) -> dict:
-    reply = grok_analysis.invoke(user_prompt)
+    prompt = user_prompt_template.format(timestamp=datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"), snapshot_json=json.dumps(get_btc_snapshot_alt()))
+    reply = grok_analysis.invoke(prompt)
     return {"analysis": reply.content}
 
 # 4️⃣ Node 2 – squeeze to JSON -------------------------------------

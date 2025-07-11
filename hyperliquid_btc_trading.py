@@ -5,7 +5,7 @@ HyperLiquid BTC/USD Perpetual Futures Bot
 
 This bot trades BTC perpetual futures on HyperLiquid with 10x leverage.
 It uses the Grok trading graph to make trading decisions and implements
-take profit (0.5%) and stop loss (0.3%) for each position.
+take profit (0.3%) and stop loss (0.28%) for each position.
 
 Dependencies:
     pip install --upgrade hyperliquid-python-sdk eth-account python-dotenv web3
@@ -35,8 +35,8 @@ MASTER_WALLET = os.getenv("HL_PUBLIC_KEY")
 POLL_SECS = 5  # Check every 5 seconds
 LEVERAGE = 10  # Use 10x leverage
 SYMBOL = "BTC"
-TAKE_PROFIT_PCT = Decimal("0.005")  # 0.5%
-STOP_LOSS_PCT = Decimal("0.003")    # 0.3%
+TAKE_PROFIT_PCT = Decimal("0.003")  # 0.3%
+STOP_LOSS_PCT = Decimal("0.0028")    # 0.28%
 
 # Logging setup
 logging.basicConfig(
