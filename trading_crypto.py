@@ -20,6 +20,7 @@ import os
 import sys
 import time
 import logging
+import math
 import json
 from decimal import Decimal, ROUND_DOWN, ROUND_UP
 from collections import deque
@@ -42,7 +43,7 @@ SIGNING_KEY_HEX = os.getenv("HL_SIGNING_KEY")
 MASTER_WALLET = os.getenv("HL_PUBLIC_KEY")
 POLL_SECS = int(os.getenv("POLLING_FREQUENCY", "5"))
 LEVERAGE = int(os.getenv("LEVERAGE", "20"))
-SYMBOL = "ETH"
+SYMBOL = os.getenv("SYMBOL")
 NUM_PARTS = 10  # Split account value into 10 equal parts for trading
 
 # Logging setup
@@ -56,6 +57,7 @@ logger = logging.getLogger("hl-bot")
 
 # --- Global State ---
 # Track open positions: list of (entry_price, size_eth)
+# trade_queue = deque([0.3424 if SYMBOL == "ETH" else 15.18])
 trade_queue = deque()
 
 # Initialize Info client (for read-only data) and wallet details
@@ -101,6 +103,11 @@ def get_market_price() -> Decimal:
     return Decimal(price_str)
 
 
+def round_down(number, ndigits=0):
+    factor = 10 ** ndigits
+    return math.floor(number * factor) / factor
+
+
 def get_account_value() -> Decimal:
     """
     Retrieve total account value in USD from clearinghouse state.
@@ -137,9 +144,11 @@ def open_long(size_usd: Decimal, tick_size: Decimal):
 
         min_size = Decimal("0.001")
         if size_eth < min_size:
-            raise ValueError(f"Order size {size_eth} ETH is below minimum {min_size} ETH")
-
-        logger.info(f"Calculated order: {size_eth:.4f} ETH (${size_usd:.2f} @ ${price:.2f})")
+            raise ValueError(f"Order size {size_eth} {SYMBOL} is below minimum {min_size} ETH")
+        
+        if SYMBOL not in ["BTC", "ETH"]:
+            size_eth = round_down(size_eth, 2)
+        logger.info(f"Calculated order: {size_eth:.4f} {SYMBOL} (${size_usd:.2f} @ ${price:.2f})")
         
         # Calculate an aggressive price 5% above market
         raw_limit_price = price * Decimal("1.05")
@@ -218,7 +227,7 @@ def close_oldest_position(tick_size: Decimal):
             trade_queue.appendleft((entry_price, size_eth))
             raise ValueError(f"Order request failed: {resp}")
         
-        pnl_usd = (price - entry_price) * size_eth
+        pnl_usd = (price - entry_price) * Decimal(str(size_eth))
         logger.info(f"✅ SELL {size_eth:.4f} {SYMBOL} @ ${price:.2f}, PnL: ${pnl_usd:.2f}")
         send_notification("SELL", f"Closed {size_eth:.4f} {SYMBOL}, PnL: ${pnl_usd:.2f}", priority=0)
 
@@ -234,7 +243,7 @@ def main():
     """
     Main trading loop.
     """
-    logger.info("🚀 Starting Hyperliquid ETH/USD trading bot...")
+    logger.info(f"🚀 Starting Hyperliquid {SYMBOL}/USD trading bot...")
     
     # --- Fetch asset metadata once at startup ---
     try:
@@ -255,7 +264,7 @@ def main():
         else:
             # Based on the error "Price must be divisible by tick size. asset=1", the tick size is likely 1.
             # We will use this as a fallback if the API does not provide the value.
-            tick_size = Decimal("1")
+            tick_size = Decimal("1") if SYMBOL in ["ETH", "BTC"] else Decimal("0.01")
             logger.warning(f"Could not find 'tickSize' for {SYMBOL} in API response. Using default: {tick_size} based on API error feedback.")
             logger.warning(f"Available keys in asset_info for {SYMBOL}: {list(asset_info.keys())}")
 
